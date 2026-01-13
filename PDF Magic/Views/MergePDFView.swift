@@ -1,0 +1,145 @@
+
+import SwiftUI
+
+struct MergePDFView: View {
+    let firstDocument: DocumentEntity
+    let viewModel: DocumentsListViewModel
+    @Environment(\.presentationMode) var presentationMode
+    @State private var selectedSecondDocument: DocumentEntity?
+    @State private var isMerging = false
+    @State private var errorMessage: String?
+    @State private var showSuccessAlert = false
+    
+    var body: some View {
+        List {
+            Section(header: Text("Первый документ")) {
+                DocumentInfoRow(document: firstDocument)
+            }
+            
+            Section(header: Text("Выберите второй документ")) {
+                if viewModel.documents.count < 2 {
+                    Text("Недостаточно документов для объединения")
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(viewModel.documents.filter { $0.id != firstDocument.id }, id: \.id) { document in
+                        Button(action: {
+                            selectedSecondDocument = document
+                        }) {
+                            HStack {
+                                DocumentInfoRow(document: document)
+                                
+                                Spacer()
+                                
+                                if selectedSecondDocument?.id == document.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if let secondDocument = selectedSecondDocument {
+                Section {
+                    Button(action: {
+                        mergeDocuments(first: firstDocument, second: secondDocument)
+                    }) {
+                        HStack {
+                            if isMerging {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            } else {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            Text(isMerging ? "Объединение..." : "Объединить PDF")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(isMerging ? Color.gray : Color.blue)
+                        .cornerRadius(10)
+                    }
+                    .disabled(isMerging)
+                }
+            }
+            
+            if let errorMessage = errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+            }
+        }
+        .navigationTitle("Объединить PDF")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Успешно", isPresented: $showSuccessAlert) {
+            Button("OK") {
+                presentationMode.wrappedValue.dismiss()
+            }
+        } message: {
+            Text("PDF документы успешно объединены")
+        }
+    }
+    
+    private func mergeDocuments(first: DocumentEntity, second: DocumentEntity) {
+        isMerging = true
+        errorMessage = nil
+        
+        let result = viewModel.mergeDocuments(first: first, second: second)
+        
+        isMerging = false
+        
+        if result.success {
+            showSuccessAlert = true
+        } else {
+            errorMessage = result.error ?? "Не удалось объединить документы. Проверьте, что файлы существуют и доступны."
+        }
+    }
+}
+
+struct DocumentInfoRow: View {
+    let document: DocumentEntity
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            if let thumbnailData = document.thumbnail,
+               let uiImage = UIImage(data: thumbnailData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 40, height: 40)
+                    .cornerRadius(6)
+                    .clipped()
+            } else {
+                Image(systemName: "doc.fill")
+                    .font(.title3)
+                    .foregroundColor(.blue)
+                    .frame(width: 40, height: 40)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(document.name ?? "Без названия")
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                if let createdAt = document.createdAt {
+                    Text(createdAt, style: .date)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    NavigationView {
+        MergePDFView(
+            firstDocument: DocumentEntity(),
+            viewModel: DocumentsListViewModel()
+        )
+    }
+}
+
