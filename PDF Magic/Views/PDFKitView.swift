@@ -64,14 +64,17 @@ struct PDFKitView: UIViewRepresentable {
                 return
             }
             
+            let currentRotation = page.rotation
+            let newRotation = (currentRotation + 90) % 360
+            
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             CATransaction.setAnimationDuration(0)
             
             pdfView.layer.removeAllAnimations()
             
-            let currentRotation = page.rotation
-            let newRotation = (currentRotation + 90) % 360
+            let wasHidden = pdfView.isHidden
+            pdfView.alpha = 0.0
             
             page.rotation = newRotation
             
@@ -79,8 +82,12 @@ struct PDFKitView: UIViewRepresentable {
             pdfView.layoutIfNeeded()
             
             CATransaction.flush()
-            
             CATransaction.commit()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                pdfView.alpha = 1.0
+                pdfView.isHidden = wasHidden
+            }
             
             print("PDFKitView: Rotated page \(pageIndex) from \(currentRotation)° to \(newRotation)°")
         }
