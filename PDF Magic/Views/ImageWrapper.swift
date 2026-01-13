@@ -6,7 +6,7 @@ struct ImageWrapper: Identifiable {
     let image: UIImage
 }
 
-extension UIImage: Identifiable {
+extension UIImage: @retroactive Identifiable {
     public var id: String {
         return UUID().uuidString
     }
