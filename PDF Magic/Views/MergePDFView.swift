@@ -11,64 +11,72 @@ struct MergePDFView: View {
     @State private var showSuccessAlert = false
     
     var body: some View {
-        List {
-            Section(header: Text("Первый документ")) {
-                DocumentInfoRow(document: firstDocument)
-            }
-            
-            Section(header: Text("Выберите второй документ")) {
-                if viewModel.documents.count < 2 {
-                    Text("Недостаточно документов для объединения")
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(viewModel.documents.filter { $0.id != firstDocument.id }, id: \.id) { document in
-                        Button(action: {
-                            selectedSecondDocument = document
-                        }) {
-                            HStack {
-                                DocumentInfoRow(document: document)
-                                
-                                Spacer()
-                                
-                                if selectedSecondDocument?.id == document.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.blue)
+        VStack(spacing: 0) {
+            List {
+                Section(header: Text("Первый документ")) {
+                    DocumentInfoRow(document: firstDocument)
+                }
+                
+                Section(header: Text("Выберите второй документ")) {
+                    if viewModel.documents.count < 2 {
+                        Text("Недостаточно документов для объединения")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(viewModel.documents.filter { $0.id != firstDocument.id }, id: \.id) { document in
+                            Button(action: {
+                                selectedSecondDocument = document
+                            }) {
+                                HStack {
+                                    DocumentInfoRow(document: document)
+                                    
+                                    Spacer()
+                                    
+                                    if selectedSecondDocument?.id == document.id {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.blue)
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                
+                if let errorMessage = errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                }
             }
             
             if let secondDocument = selectedSecondDocument {
-                Section {
+                VStack(spacing: 0) {
+                    Divider()
+                    
                     Button(action: {
                         mergeDocuments(first: firstDocument, second: secondDocument)
                     }) {
                         HStack {
                             if isMerging {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             } else {
                                 Image(systemName: "doc.on.doc")
                             }
                             Text(isMerging ? "Объединение..." : "Объединить PDF")
+                                .font(.headline)
                         }
                         .frame(maxWidth: .infinity)
                         .foregroundColor(.white)
                         .padding()
                         .background(isMerging ? Color.gray : Color.blue)
-                        .cornerRadius(10)
+                        .cornerRadius(12)
                     }
                     .disabled(isMerging)
-                }
-            }
-            
-            if let errorMessage = errorMessage {
-                Section {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .background(Color(.systemBackground))
                 }
             }
         }
@@ -87,14 +95,21 @@ struct MergePDFView: View {
         isMerging = true
         errorMessage = nil
         
-        let result = viewModel.mergeDocuments(first: first, second: second)
-        
-        isMerging = false
-        
-        if result.success {
-            showSuccessAlert = true
-        } else {
-            errorMessage = result.error ?? "Не удалось объединить документы. Проверьте, что файлы существуют и доступны."
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = self.viewModel.mergeDocuments(first: first, second: second)
+            
+            DispatchQueue.main.async {
+                self.isMerging = false
+                
+                if result.success {
+                    self.showSuccessAlert = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.presentationMode.wrappedValue.dismiss()
+                    }
+                } else {
+                    self.errorMessage = result.error ?? "Не удалось объединить документы. Проверьте, что файлы существуют и доступны."
+                }
+            }
         }
     }
 }
@@ -123,6 +138,7 @@ struct DocumentInfoRow: View {
                 Text(document.name ?? "Без названия")
                     .font(.headline)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 if let createdAt = document.createdAt {
                     Text(createdAt, style: .date)
